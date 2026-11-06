@@ -3,8 +3,11 @@ const { ApiError } = require('../middleware/error_handler');
 
 const CATEGORIES = ['Бот', 'Интеграция', 'Отчёт', 'Другое'];
 const STATUSES = ['draft', 'new', 'in_work', 'done', 'closed'];
-// Tickets in these statuses can be edited/deleted ("open" tickets).
-const EDITABLE_STATUSES = ['draft', 'new', 'in_work'];
+// Tickets in these statuses can be edited ("open" tickets).
+// "done" is still editable (a finished ticket can be reopened), only "closed" is terminal.
+const EDITABLE_STATUSES = ['draft', 'new', 'in_work', 'done'];
+// Terminal status: no edits, no status changes.
+const TERMINAL_STATUS = 'closed';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -102,12 +105,17 @@ async function createFromDraft(userId, { draftId, title, description, category }
   return { ticket, newDraft };
 }
 
-// PATCH /tickets/:id — edit fields / change status. Only open tickets (or draft).
+// PATCH /tickets/:id — edit fields / change status.
+// Allowed for open tickets: draft, new, in_work, done. Forbidden for terminal "closed".
 async function updateTicket(userId, ticketId, patch) {
   const ticket = await getTicket(userId, ticketId);
 
   if (!EDITABLE_STATUSES.includes(ticket.status)) {
-    throw new ApiError(409, 'TICKET_NOT_EDITABLE', `Ticket in status "${ticket.status}" cannot be edited`);
+    throw new ApiError(
+      409,
+      'TICKET_NOT_EDITABLE',
+      `Ticket in status "${ticket.status}" is closed and cannot be edited`
+    );
   }
 
   const body = { updated_at: new Date().toISOString() };
@@ -130,10 +138,14 @@ async function updateTicket(userId, ticketId, patch) {
     if (ticket.status === 'draft') {
       throw new ApiError(400, 'VALIDATION_ERROR', 'Draft status cannot be changed directly, submit it as a ticket');
     }
-    if (!STATUSES.includes(patch.status) || patch.status === 'draft') {
+    if (patch.status === TERMINAL_STATUS && ticket.status !== TERMINAL_STATUS) {
+      // closing is allowed from any open status (new/in_work/done)
+      body.status = TERMINAL_STATUS;
+    } else if (!STATUSES.includes(patch.status) || patch.status === 'draft' || patch.status === TERMINAL_STATUS) {
       throw new ApiError(400, 'VALIDATION_ERROR', `Status must be one of: ${STATUSES.filter(s => s !== 'draft').join(', ')}`);
+    } else {
+      body.status = patch.status;
     }
-    body.status = patch.status;
   }
 
   if (Object.keys(body).length === 1) {
@@ -141,10 +153,11 @@ async function updateTicket(userId, ticketId, patch) {
   }
 
   const rows = await db.update('tickets', `id=eq.${ticketId}`, body);
+  console.log(`Ticket updated: ${ticketId} (user ${userId}), status ${ticket.status} -> ${rows[0].status}`);
   return rows[0];
 }
 
-// DELETE /tickets/:id — only own, non-draft tickets.
+// DELETE /tickets/:id — only own, non-draft tickets (closed included).
 async function deleteTicket(userId, ticketId) {
   const ticket = await getTicket(userId, ticketId);
   if (ticket.status === 'draft') {
@@ -158,6 +171,8 @@ async function deleteTicket(userId, ticketId) {
 module.exports = {
   CATEGORIES,
   STATUSES,
+  EDITABLE_STATUSES,
+  TERMINAL_STATUS,
   createDraft,
   getUserDraft,
   listTickets,

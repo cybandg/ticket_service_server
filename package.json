@@ -1,6 +1,6 @@
 {
   "name": "ticket_service_server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Ticket registration service on Node.js + Supabase",
   "main": "main.js",
   "scripts": {
