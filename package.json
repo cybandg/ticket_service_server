@@ -1,0 +1,21 @@
+{
+  "name": "ticket_service_server",
+  "version": "1.0.0",
+  "description": "Ticket registration service on Node.js + Supabase",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "node --watch main.js",
+    "test": "node --test tests/auth_test.js tests/ticket_tests.js",
+    "test:race": "node --test tests/race_test.js",
+    "test:all": "node --test tests/auth_test.js tests/ticket_tests.js tests/race_test.js",
+    "test:load": "node bench/load_test.js",
+    "smoke": "bash bench/smoke.sh",
+    "verify": "node --test tests/auth_test.js tests/ticket_tests.js tests/race_test.js && bash bench/smoke.sh",
+    "check:env": "node -e \"['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_PROJECT_REF','SUPABASE_ACCESS_TOKEN','JWT_ACCESS_SECRET','JWT_REFRESH_SECRET'].forEach(k=>console.log((process.env[k]?'OK   ':'MISS ')+k))\" ",
+    "check:routes": "node -e \"console.log('auth:', typeof require('./routes/auth_routes'), '| tickets:', typeof require('./routes/ticket_routes'))\""
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

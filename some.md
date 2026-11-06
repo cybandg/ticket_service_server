@@ -1,0 +1,1 @@
+https://bzvrdjknofsdenfbijqg.supabase.co
